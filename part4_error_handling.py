@@ -9,7 +9,8 @@ Learn:
 - Timeout handling
 - Response validation
 """
-
+import time
+import logging
 import requests
 from requests.exceptions import (
     ConnectionError,
@@ -17,29 +18,41 @@ from requests.exceptions import (
     HTTPError,
     RequestException
 )
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
+# Exercise 3: Add logging to track all API requests
+#             import logging
+#             logging.basicConfig(level=logging.INFO)
 
 def safe_api_request(url, timeout=5):
-    """Make an API request with proper error handling."""
+    logging.info(f"Calling API: {url}")
+
     try:
         response = requests.get(url, timeout=timeout)
-
-        # Raise exception for bad status codes (4xx, 5xx)
         response.raise_for_status()
 
+        logging.info("API request successful")
         return {"success": True, "data": response.json()}
 
     except ConnectionError:
+        logging.error("Connection failed")
         return {"success": False, "error": "Connection failed. Check your internet."}
 
     except Timeout:
+        logging.warning("Request timed out")
         return {"success": False, "error": f"Request timed out after {timeout} seconds."}
 
     except HTTPError as e:
+        logging.error(f"HTTP Error: {e.response.status_code}")
         return {"success": False, "error": f"HTTP Error: {e.response.status_code}"}
 
     except RequestException as e:
+        logging.error(f"Request failed: {e}")
         return {"success": False, "error": f"Request failed: {str(e)}"}
+
 
 
 def demo_error_handling():
@@ -78,6 +91,19 @@ def demo_error_handling():
     else:
         print(f"Failed: {result['error']}")
 
+# Exercise 2: Create a function that validates crypto response
+#             Check that 'quotes' and 'USD' keys exist before accessing
+
+def validate_crypto_response(data):
+    """Validate required crypto response fields."""
+
+    if 'quotes' not in data:
+        return False, "Missing 'quotes' data"
+
+    if 'USD' not in data['quotes']:
+        return False, "Missing 'USD' price data"
+
+    return True, None
 
 def fetch_crypto_safely():
     """Fetch crypto data with full error handling."""
@@ -94,12 +120,23 @@ def fetch_crypto_safely():
 
     if result["success"]:
         data = result["data"]
+
+        valid, error = validate_crypto_response(data)
+
+        if not valid:
+            print(f"Invalid API response: {error}")
+            return
+
         print(f"\n{data['name']} ({data['symbol']})")
         print(f"Price: ${data['quotes']['USD']['price']:,.2f}")
         print(f"24h Change: {data['quotes']['USD']['percent_change_24h']:+.2f}%")
     else:
         print(f"\nError: {result['error']}")
         print("Tip: Try 'btc-bitcoin' or 'eth-ethereum'")
+
+def run_exercise_2():
+    print("\n=== Exercise 2: Crypto Response Validation ===\n")
+    fetch_crypto_safely()
 
 
 def validate_json_response():
@@ -131,6 +168,34 @@ def validate_json_response():
     except Exception as e:
         print(f"Error: {e}")
 
+# Exercise 1: Add retry logic - if request fails, try again up to 3 times
+#             Hint: Use a for loop and time.sleep() between retries
+def safe_api_request_with_retry(url, timeout=5, retries=3):
+    """API request with retry logic"""
+
+    for attempt in range(1, retries + 1):
+        print(f"Attempt {attempt}...")
+
+        result = safe_api_request(url, timeout)
+
+        if result["success"]:
+            return result
+
+        time.sleep(1)  # wait before retry
+
+    return {"success": False, "error": "Request failed after multiple retries"}
+
+def run_exercise_1():
+    print("\n=== Exercise 1: Retry Logic ===\n")
+
+    url = "https://this-domain-does-not-exist-12345.com/api"
+    result = safe_api_request_with_retry(url)
+
+    if result["success"]:
+        print("Request successful")
+    else:
+        print("Request failed:", result["error"])
+
 
 def main():
     """Run all demos."""
@@ -139,20 +204,9 @@ def main():
     validate_json_response()
     print("\n" + "=" * 40 + "\n")
     fetch_crypto_safely()
-
+    run_exercise_1()
+    run_exercise_2()
+    
 
 if __name__ == "__main__":
     main()
-
-
-# --- EXERCISES ---
-#
-# Exercise 1: Add retry logic - if request fails, try again up to 3 times
-#             Hint: Use a for loop and time.sleep() between retries
-#
-# Exercise 2: Create a function that validates crypto response
-#             Check that 'quotes' and 'USD' keys exist before accessing
-#
-# Exercise 3: Add logging to track all API requests
-#             import logging
-#             logging.basicConfig(level=logging.INFO)
